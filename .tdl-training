@@ -1,0 +1,5 @@
+training_name = "backend-masterclass-beta"
+git_configured = true
+git_enabled = true
+git_auto_commit = true
+git_sync_mode = "compare"
