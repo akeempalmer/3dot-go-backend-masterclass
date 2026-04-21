@@ -2,9 +2,8 @@ package http
 
 import (
 	"context"
-	"eats/backend/common"
 
-	"github.com/google/uuid"
+	"eats/backend/common"
 )
 
 type Handler struct{}
@@ -20,8 +19,7 @@ func Register(ctx context.Context, e common.EchoRouter, handler Handler) error {
 }
 
 func (h Handler) RegisterCustomer(ctx context.Context, request RegisterCustomerRequestObject) (RegisterCustomerResponseObject, error) {
-
-	customerUuid := uuid.New()
+	customerUuid := common.NewUUIDv7()
 	return RegisterCustomer201JSONResponse{
 		CustomerUuid: customerUuid,
 	}, nil
