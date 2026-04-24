@@ -26,7 +26,7 @@ func NewCustomerRepository(db *pgxpool.Pool) *CustomerRepository {
 	}
 }
 
-func (r *CustomerRepository) RegisterCustomer(ctx context.Context, customerUUID common.UUID, customer http.RegisterCustomer) error {
+func (r *CustomerRepository) RegisterCustomer(ctx context.Context, customer app.Customer) error {
 	queries := dbmodels.New(r.db)
 
 	commonAddress, err := openapiAddressToSharedAddress(customer.Address)
@@ -35,7 +35,7 @@ func (r *CustomerRepository) RegisterCustomer(ctx context.Context, customerUUID 
 	}
 
 	err = queries.InsertCustomer(ctx, dbmodels.InsertCustomerParams{
-		CustomerUuid: customerUUID,
+		CustomerUuid: customer.CustomerUUID,
 		Name:         customer.Name,
 		Email:        string(customer.Email),
 		Address:      commonAddress,
@@ -46,19 +46,4 @@ func (r *CustomerRepository) RegisterCustomer(ctx context.Context, customerUUID 
 	}
 
 	return nil
-}
-
-func openapiAddressToSharedAddress(addr http.Address) (shared.Address, error) {
-	sharedAddr, err := shared.NewAddress(
-		addr.Line1,
-		addr.Line2,
-		addr.PostalCode,
-		addr.City,
-		addr.CountryCode,
-	)
-	if err != nil {
-		return shared.Address{}, err
-	}
-
-	return sharedAddr, nil
 }
