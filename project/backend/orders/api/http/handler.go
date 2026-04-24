@@ -4,7 +4,6 @@ import (
 	"context"
 	"eats/backend/common"
 	"eats/backend/common/shared"
-	"eats/backend/orders/adapters/db/dbmodels"
 
 	"github.com/jackc/pgx/v5/pgxpool"
 )
@@ -31,17 +30,6 @@ func Register(ctx context.Context, e common.EchoRouter, handler Handler) error {
 
 func (h Handler) RegisterCustomer(ctx context.Context, request RegisterCustomerRequestObject) (RegisterCustomerResponseObject, error) {
 	customerUuid := common.NewUUIDv7()
-	queries := dbmodels.New(h.db)
-
-	newAddress, _ := openapiAddressToSharedAddress(request.Body.Address)
-
-	_ = queries.InsertCustomer(ctx, dbmodels.InsertCustomerParams{
-		CustomerUuid: customerUuid,
-		Name:         request.Body.Name,
-		Email:        string(request.Body.Email),
-		Address:      newAddress,
-		PhoneNumber:  request.Body.PhoneNumber,
-	})
 
 	return RegisterCustomer201JSONResponse{
 		CustomerUuid: customerUuid,
