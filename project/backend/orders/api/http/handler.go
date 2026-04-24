@@ -4,22 +4,24 @@ import (
 	"context"
 	"eats/backend/common"
 	"eats/backend/common/shared"
-
-	"github.com/jackc/pgx/v5/pgxpool"
 )
 
 type Handler struct {
-	db *pgxpool.Pool
+	customerRepo CustomerRepository
 }
 
-func NewHandler(db *pgxpool.Pool) Handler {
-	if db == nil {
-		panic("db cannot be nil")
+func NewHandler(customerRepo CustomerRepository) Handler {
+	if customerRepo == nil {
+		panic("customer repo cannot be nil")
 	}
 
 	return Handler{
-		db: db,
+		customerRepo: customerRepo,
 	}
+}
+
+type CustomerRepository interface {
+	RegisterCustomer(ctx context.Context, customerUUID common.UUID, customer RegisterCustomer) error
 }
 
 func Register(ctx context.Context, e common.EchoRouter, handler Handler) error {
@@ -30,6 +32,8 @@ func Register(ctx context.Context, e common.EchoRouter, handler Handler) error {
 
 func (h Handler) RegisterCustomer(ctx context.Context, request RegisterCustomerRequestObject) (RegisterCustomerResponseObject, error) {
 	customerUuid := common.NewUUIDv7()
+
+	h.customerRepo.RegisterCustomer(ctx, customerUuid, *request.Body)
 
 	return RegisterCustomer201JSONResponse{
 		CustomerUuid: customerUuid,
