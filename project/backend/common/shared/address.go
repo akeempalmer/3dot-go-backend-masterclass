@@ -67,13 +67,3 @@ func (e Address) Value() (driver.Value, error) {
 
 	return string(data), nil
 }
-
-func OpenapiAddressToSharedAddress(addr Address) (Address, error) {
-	return NewAddress(
-		addr.Line1,
-		addr.Line2,
-		addr.PostalCode,
-		addr.City,
-		addr.CountryCode,
-	)
-}

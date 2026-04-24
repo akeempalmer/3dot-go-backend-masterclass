@@ -5,7 +5,6 @@ import (
 	"eats/backend/common"
 	"eats/backend/common/shared"
 	"eats/backend/orders/adapters/db/dbmodels"
-	"fmt"
 
 	"github.com/jackc/pgx/v5/pgxpool"
 )
@@ -34,17 +33,27 @@ func (h Handler) RegisterCustomer(ctx context.Context, request RegisterCustomerR
 	customerUuid := common.NewUUIDv7()
 	queries := dbmodels.New(h.db)
 
-	fmt.Printf("Registering customer with UUID: %s\n", request)
+	newAddress, _ := openapiAddressToSharedAddress(request.Body.Address)
 
-	err := queries.InsertCustomer(ctx, dbmodels.InsertCustomerParams{
+	_ = queries.InsertCustomer(ctx, dbmodels.InsertCustomerParams{
 		CustomerUuid: customerUuid,
 		Name:         request.Body.Name,
 		Email:        string(request.Body.Email),
-		Address:      shared.OpenapiAddressToSharedAddress(request.Body.Address),
+		Address:      newAddress,
 		PhoneNumber:  request.Body.PhoneNumber,
 	})
 
 	return RegisterCustomer201JSONResponse{
 		CustomerUuid: customerUuid,
 	}, nil
+}
+
+func openapiAddressToSharedAddress(addr Address) (shared.Address, error) {
+	return shared.NewAddress(
+		addr.Line1,
+		addr.Line2,
+		addr.PostalCode,
+		addr.City,
+		addr.CountryCode,
+	)
 }
