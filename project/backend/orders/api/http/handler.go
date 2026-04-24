@@ -29,7 +29,7 @@ func NewHandler(
 }
 
 func (h Handler) RegisterCustomer(ctx context.Context, request RegisterCustomerRequestObject) (RegisterCustomerResponseObject, error) {
-	customerUUID := common.NewUUIDv7()
+	customerUUID := app.CustomerUUID{common.NewUUIDv7()}
 
 	customerAddress, _ := openapiAddressToSharedAddress(request.Body.Address)
 

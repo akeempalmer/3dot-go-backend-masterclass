@@ -13,7 +13,6 @@ import (
 	"github.com/google/go-cmp/cmp/cmpopts"
 	"github.com/stretchr/testify/require"
 
-	"eats/backend/common"
 	"eats/backend/common/shared"
 	"eats/backend/common/testutils"
 	"eats/backend/orders/adapters/db"
@@ -29,7 +28,7 @@ func TestRegisterCustomer(t *testing.T) {
 	customerRepo := db.NewCustomerRepository(dbPool)
 
 	// Create a customer
-	customerUUID := common.NewUUIDv7()
+	customerUUID := app.CustomerUUID{common.NewUUIDv7()}
 	customer := app.Customer{
 		CustomerUUID: customerUUID,
 		Name:         gofakeit.Name(),

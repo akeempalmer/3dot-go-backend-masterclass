@@ -25,11 +25,11 @@ sql:
               import: "time"
               type: "Time"
 
-          - db_type: "uuid"
+          - column: "orders.customers.customer_uuid"
             nullable: false
             go_type:
-              import: "eats/backend/common"
-              type: "UUID"
+              import: "eats/backend/orders/app"
+              type: "CustomerUUID"
 
           - db_type: "uuid"
             nullable: true
