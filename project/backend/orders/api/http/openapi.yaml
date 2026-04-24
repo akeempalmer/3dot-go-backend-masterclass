@@ -80,7 +80,7 @@ components:
       format: uuid
       description: UUID of a customer
       x-go-type: common.UUID
-      x-go-type-import: 
+      x-go-type-import:
         path: eats/backend/common
 
     Address:

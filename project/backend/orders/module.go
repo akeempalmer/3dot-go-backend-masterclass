@@ -12,6 +12,7 @@ import (
 	"eats/backend/orders/adapters/db"
 	http2 "eats/backend/orders/api/http"
 	ordersModule "eats/backend/orders/api/module"
+	"eats/backend/orders/app"
 )
 
 type Module struct {
@@ -37,7 +38,12 @@ var embedMigrations embed.FS
 
 func (m *Module) Init(ctx context.Context) error {
 	customerRepo := db.NewCustomerRepository(m.pgxDb)
-	httpHandler := http2.NewHandler(customerRepo)
+
+	appService := app.NewService(customerRepo, m.modules)
+
+	httpHandler := http2.NewHandler(
+		appService,
+	)
 	m.httpHandler = httpHandler
 
 	if err := common.MigrateDatabaseUp(

@@ -2,6 +2,7 @@ package db
 
 import (
 	"context"
+	"fmt"
 
 	"github.com/jackc/pgx/v5/pgxpool"
 
@@ -26,28 +27,38 @@ func NewCustomerRepository(db *pgxpool.Pool) *CustomerRepository {
 }
 
 func (r *CustomerRepository) RegisterCustomer(ctx context.Context, customerUUID common.UUID, customer http.RegisterCustomer) error {
-	// TODO: implement me
 	queries := dbmodels.New(r.db)
 
-	newAddress, _ := openapiAddressToSharedAddress(customer.Address)
+	commonAddress, err := openapiAddressToSharedAddress(customer.Address)
+	if err != nil {
+		return fmt.Errorf("convert address failed: %w", err)
+	}
 
-	_ = queries.InsertCustomer(ctx, dbmodels.InsertCustomerParams{
+	err = queries.InsertCustomer(ctx, dbmodels.InsertCustomerParams{
 		CustomerUuid: customerUUID,
 		Name:         customer.Name,
 		Email:        string(customer.Email),
-		Address:      newAddress,
+		Address:      commonAddress,
 		PhoneNumber:  customer.PhoneNumber,
 	})
+	if err != nil {
+		return fmt.Errorf("insert customer failed: %w", err)
+	}
 
 	return nil
 }
 
 func openapiAddressToSharedAddress(addr http.Address) (shared.Address, error) {
-	return shared.NewAddress(
+	sharedAddr, err := shared.NewAddress(
 		addr.Line1,
 		addr.Line2,
 		addr.PostalCode,
 		addr.City,
 		addr.CountryCode,
 	)
+	if err != nil {
+		return shared.Address{}, err
+	}
+
+	return sharedAddr, nil
 }
