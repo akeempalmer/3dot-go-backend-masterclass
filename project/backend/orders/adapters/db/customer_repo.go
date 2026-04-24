@@ -4,12 +4,10 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/jackc/pgx/v5/pgxpool"
-
-	"eats/backend/common"
-	"eats/backend/common/shared"
 	"eats/backend/orders/adapters/db/dbmodels"
-	"eats/backend/orders/api/http"
+	"eats/backend/orders/app"
+
+	"github.com/jackc/pgx/v5/pgxpool"
 )
 
 type CustomerRepository struct {
@@ -29,16 +27,11 @@ func NewCustomerRepository(db *pgxpool.Pool) *CustomerRepository {
 func (r *CustomerRepository) RegisterCustomer(ctx context.Context, customer app.Customer) error {
 	queries := dbmodels.New(r.db)
 
-	commonAddress, err := openapiAddressToSharedAddress(customer.Address)
-	if err != nil {
-		return fmt.Errorf("convert address failed: %w", err)
-	}
-
-	err = queries.InsertCustomer(ctx, dbmodels.InsertCustomerParams{
+	err := queries.InsertCustomer(ctx, dbmodels.InsertCustomerParams{
 		CustomerUuid: customer.CustomerUUID,
 		Name:         customer.Name,
 		Email:        string(customer.Email),
-		Address:      commonAddress,
+		Address:      customer.Address,
 		PhoneNumber:  customer.PhoneNumber,
 	})
 	if err != nil {
