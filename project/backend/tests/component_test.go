@@ -3,6 +3,8 @@ package tests_test
 import (
 	"eats/backend/common/testutils"
 	"testing"
+
+	"github.com/stretchr/testify/assert"
 )
 
 func TestComponent_CriticalFlow(t *testing.T) {
@@ -11,10 +13,12 @@ func TestComponent_CriticalFlow(t *testing.T) {
 
 	ctx := t.Context()
 
-	var country = testutils.GetRandomCountry()
+	var country = testutils.GenerateRandomCountry()
+
+	var clients = newTestClients(t)
 
 	customerUUID := registerCustomerInCity(ctx, t, clients, country, "New York")
 
-	t.assert.NotEmpty(t, customerUUID)
+	assert.NotEmpty(t, customerUUID)
 
 }
