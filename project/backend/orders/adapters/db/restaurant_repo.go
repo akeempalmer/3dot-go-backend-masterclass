@@ -10,6 +10,7 @@ import (
 
 	"eats/backend/common"
 	"eats/backend/common/log"
+	"eats/backend/common/shared"
 	"eats/backend/orders/adapters/db/dbmodels"
 	"eats/backend/orders/app"
 )
@@ -52,7 +53,7 @@ func (r *RestaurantRepository) UpsertRestaurant(ctx context.Context, restaurantU
 
 	// TODO: upsert menu items
 	for _, item := range restaurant.MenuItems {
-		err = queries.UpsertRestaurantMenuItem(ctx, dbmodels.UpsertRestaurantMenu{
+		err = queries.UpsertRestaurantMenuItem(ctx, dbmodels.UpsertRestaurantMenuItemParams{
 			RestaurantMenuItemUuid: item.MenuItemUUID,
 			RestaurantUuid:         restaurantUUID,
 			Name:                   item.Name,
@@ -96,11 +97,13 @@ func (r *RestaurantRepository) GetRestaurantMenu(ctx context.Context, restaurant
 		return app.RestaurantMenu{}, fmt.Errorf("get restaurant %s failed: %w", restaurantUUID, err)
 	}
 
+	currencyCode := shared.MustNewCurrency(restaurant.Currency)
+
 	return app.RestaurantMenu{
 		RestaurantName: restaurant.Name,
 		Address:        restaurant.Address,
 		Description:    restaurant.Description,
-		Currency:       restaurant.Currency.Code(),
+		Currency:       currencyCode,
 		Positions:      items,
 	}, nil
 }
