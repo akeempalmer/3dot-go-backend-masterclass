@@ -52,10 +52,10 @@ sql:
               import: "eats/backend/orders/app"
               type: "RestaurantUUID"
 
-          - column: "orders.restaurants.currency"
+          - db_type: "pg_catalog.numeric"
             go_type:
-              import: "eats/backend/common/shared"
-              type: "Currency"
+              import: "github.com/shopspring/decimal"
+              type: "Decimal"
 
           - column: "orders.restaurants.address"
             go_type:

@@ -38,7 +38,7 @@ func (r *RestaurantRepository) UpsertRestaurant(ctx context.Context, restaurantU
 		restaurant.Name,
 		restaurant.Description,
 		restaurant.Address,
-		restaurant.Currency,
+		restaurant.Currency.Code(),
 	})
 	if err != nil {
 		return fmt.Errorf("upsert restaurant failed: %w", err)
@@ -46,11 +46,24 @@ func (r *RestaurantRepository) UpsertRestaurant(ctx context.Context, restaurantU
 
 	// Currency is immutable after creation - the upsert doesn't update it.
 	// Check here catches attempts to change it and returns a clear error.
-	if dbRestaurant.Currency != restaurant.Currency {
+	if dbRestaurant.Currency != restaurant.Currency.Code() {
 		return common.NewInvalidInputError("cannot-change-currency", "cannot change restaurant currency once set")
 	}
 
 	// TODO: upsert menu items
+	for _, item := range restaurant.MenuItems {
+		err = queries.UpsertRestaurantMenuItem(ctx, dbmodels.UpsertRestaurantMenu{
+			RestaurantMenuItemUuid: item.MenuItemUUID,
+			RestaurantUuid:         restaurantUUID,
+			Name:                   item.Name,
+			GrossPrice:             item.GrossPrice,
+			Ordering:               item.Ordering,
+			IsArchived:             false,
+		})
+		if err != nil {
+			return fmt.Errorf("upsert restaurant menu position failed for menu position %s: %w", item.MenuItemUUID, err)
+		}
+	}
 
 	return nil
 }
@@ -87,7 +100,7 @@ func (r *RestaurantRepository) GetRestaurantMenu(ctx context.Context, restaurant
 		RestaurantName: restaurant.Name,
 		Address:        restaurant.Address,
 		Description:    restaurant.Description,
-		Currency:       restaurant.Currency,
+		Currency:       restaurant.Currency.Code(),
 		Positions:      items,
 	}, nil
 }
