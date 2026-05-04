@@ -30,43 +30,77 @@ func NewRestaurantRepository(db *pgxpool.Pool) *RestaurantRepository {
 }
 
 func (r *RestaurantRepository) UpsertRestaurant(ctx context.Context, restaurantUUID app.RestaurantUUID, restaurant app.OnboardRestaurant) error {
-	queries := dbmodels.New(r.db)
+	return common.UpdateInTx(ctx, r.db, func(ctx context.Context, tx pgx.Tx) error {
+		queries := dbmodels.New(tx)
 
-	log.FromContext(ctx).With("restaurant_uuid", restaurantUUID).Info("Upserting restaurant")
+		dbRestaurantMenu, err := queries.GetRestaurantMenu(ctx, restaurantUUID)
 
-	dbRestaurant, err := queries.UpsertRestaurant(ctx, dbmodels.UpsertRestaurantParams{
-		restaurantUUID,
-		restaurant.Name,
-		restaurant.Description,
-		restaurant.Address,
-		restaurant.Currency.Code(),
-	})
-	if err != nil {
-		return fmt.Errorf("upsert restaurant failed: %w", err)
-	}
+		log.FromContext(ctx).With("restaurant_uuid", restaurantUUID).Info("Upserting restaurant")
 
-	// Currency is immutable after creation - the upsert doesn't update it.
-	// Check here catches attempts to change it and returns a clear error.
-	if dbRestaurant.Currency != restaurant.Currency.Code() {
-		return common.NewInvalidInputError("cannot-change-currency", "cannot change restaurant currency once set")
-	}
-
-	// TODO: upsert menu items
-	for _, item := range restaurant.MenuItems {
-		err = queries.UpsertRestaurantMenuItem(ctx, dbmodels.UpsertRestaurantMenuItemParams{
-			RestaurantMenuItemUuid: item.MenuItemUUID,
-			RestaurantUuid:         restaurantUUID,
-			Name:                   item.Name,
-			GrossPrice:             item.GrossPrice,
-			Ordering:               item.Ordering,
-			IsArchived:             false,
+		dbRestaurant, err := queries.UpsertRestaurant(ctx, dbmodels.UpsertRestaurantParams{
+			restaurantUUID,
+			restaurant.Name,
+			restaurant.Description,
+			restaurant.Address,
+			restaurant.Currency.Code(),
 		})
 		if err != nil {
-			return fmt.Errorf("upsert restaurant menu position failed for menu position %s: %w", item.MenuItemUUID, err)
+			return fmt.Errorf("upsert restaurant failed: %w", err)
 		}
-	}
 
-	return nil
+		// Currency is immutable after creation - the upsert doesn't update it.
+		// Check here catches attempts to change it and returns a clear error.
+		if dbRestaurant.Currency != restaurant.Currency.Code() {
+			return common.NewInvalidInputError("cannot-change-currency", "cannot change restaurant currency once set")
+		}
+
+		// TODO: upsert menu items
+		for _, item := range restaurant.MenuItems {
+			err = queries.UpsertRestaurantMenuItem(ctx, dbmodels.UpsertRestaurantMenuItemParams{
+				RestaurantMenuItemUuid: item.MenuItemUUID,
+				RestaurantUuid:         restaurantUUID,
+				Name:                   item.Name,
+				GrossPrice:             item.GrossPrice,
+				Ordering:               item.Ordering,
+				IsArchived:             false,
+			})
+			if err != nil {
+				return fmt.Errorf("upsert restaurant menu position failed for menu position %s: %w", item.MenuItemUUID, err)
+			}
+		}
+
+		currentMenuItemsUUIDs := make([]common.UUID, 0)
+		for _, item := range dbRestaurantMenu {
+			currentMenuItemsUUIDs = append(currentMenuItemsUUIDs, item.RestaurantUuid)
+		}
+
+		// get the list of different uuid.
+		menuItemsToArchive := make([]common.UUID, 0)
+		for _, currentUUID := range currentMenuItemsUUIDs {
+			found := false
+
+			fmt.Printf("%v", currentMenuItem)
+			for _, newItem := range restaurant.MenuItems {
+				if currentUUID == newItem.MenuItemUUID {
+					found = true
+					break
+				}
+			}
+			if !found {
+				menuItemsToArchive = append(menuItemsToArchive, currentUUID)
+			}
+		}
+
+		// Call archive
+		if len(menuItemsToArchive) > 0 {
+			err = queries.ArchiveMenuItems(ctx, menuItemsToArchive)
+			if err != nil {
+				return fmt.Errorf("archive menu items failed: %w", err)
+			}
+		}
+		return nil
+
+	})
 }
 
 func (r *RestaurantRepository) GetRestaurantMenu(ctx context.Context, restaurantUUID app.RestaurantUUID) (app.RestaurantMenu, error) {

@@ -33,3 +33,10 @@ ON CONFLICT (restaurant_menu_item_uuid) DO UPDATE SET
 	ordering = EXCLUDED.ordering,
 	is_archived = EXCLUDED.is_archived
 ;
+
+
+-- name: ArchiveMenuItems :exec
+UPDATE orders.restaurant_menu_items
+SET is_archived = true
+WHERE restaurant_menu_item_uuid = ANY($1::UUID[])
+;

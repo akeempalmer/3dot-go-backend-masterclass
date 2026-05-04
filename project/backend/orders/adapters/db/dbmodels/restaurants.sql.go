@@ -10,8 +10,20 @@ import (
 
 	"eats/backend/common/shared"
 	"eats/backend/orders/app"
+	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/shopspring/decimal"
 )
+
+const archiveMenuItems = `-- name: ArchiveMenuItems :exec
+UPDATE orders.restaurant_menu_items
+SET is_archived = true
+WHERE restaurant_menu_item_uuid = ANY($1::UUID[])
+`
+
+func (q *Queries) ArchiveMenuItems(ctx context.Context, dollar_1 []pgtype.UUID) error {
+	_, err := q.db.Exec(ctx, archiveMenuItems, dollar_1)
+	return err
+}
 
 const getRestaurant = `-- name: GetRestaurant :one
 SELECT
