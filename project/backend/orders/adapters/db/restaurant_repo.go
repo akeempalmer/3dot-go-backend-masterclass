@@ -6,6 +6,7 @@ import (
 	"fmt"
 
 	pgx "github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"eats/backend/common"
@@ -71,7 +72,7 @@ func (r *RestaurantRepository) UpsertRestaurant(ctx context.Context, restaurantU
 
 		currentMenuItemsUUIDs := make([]common.UUID, 0)
 		for _, item := range dbRestaurantMenu {
-			currentMenuItemsUUIDs = append(currentMenuItemsUUIDs, item.RestaurantUuid)
+			currentMenuItemsUUIDs = append(currentMenuItemsUUIDs, item.OrdersRestaurantMenuItem.RestaurantMenuItemUuid.UUID)
 		}
 
 		// get the list of different uuid.
@@ -79,21 +80,30 @@ func (r *RestaurantRepository) UpsertRestaurant(ctx context.Context, restaurantU
 		for _, currentUUID := range currentMenuItemsUUIDs {
 			found := false
 
-			fmt.Printf("%v", currentMenuItem)
 			for _, newItem := range restaurant.MenuItems {
-				if currentUUID == newItem.MenuItemUUID {
+				if currentUUID == newItem.MenuItemUUID.UUID {
 					found = true
 					break
 				}
 			}
 			if !found {
+
 				menuItemsToArchive = append(menuItemsToArchive, currentUUID)
 			}
 		}
 
 		// Call archive
 		if len(menuItemsToArchive) > 0 {
-			err = queries.ArchiveMenuItems(ctx, menuItemsToArchive)
+			pgUUIDs := make([]pgtype.UUID, 0, len(menuItemsToArchive))
+
+			for _, id := range menuItemsToArchive {
+				pgUUIDs = append(pgUUIDs, pgtype.UUID{
+					Bytes: id,
+					Valid: true,
+				})
+			}
+
+			err = queries.ArchiveMenuItems(ctx, pgUUIDs)
 			if err != nil {
 				return fmt.Errorf("archive menu items failed: %w", err)
 			}
