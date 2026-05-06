@@ -13,7 +13,6 @@ func NewService(
 	restaurantRepository RestaurantRepository,
 	customerRepository CustomerRepository,
 	orderRepository OrderRepository,
-	restaurantRepository RestaurantRepository,
 	modules ModulesContract,
 ) *Service {
 	if restaurantRepository == nil {
@@ -21,10 +20,6 @@ func NewService(
 	}
 	if customerRepository == nil {
 		panic("customerRepository cannot be nil")
-	}
-
-	if restaurantRepository == nil {
-		panic("restaurantRepository cannot be nil")
 	}
 
 	if orderRepository == nil {
@@ -37,7 +32,6 @@ func NewService(
 	return &Service{
 		restaurantRepository: restaurantRepository,
 		customerRepository:   customerRepository,
-		restaurantRepository: restaurantRepository,
 		orderRepository:      orderRepository,
 		modules:              modules,
 	}

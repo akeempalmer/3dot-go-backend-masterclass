@@ -28,6 +28,44 @@ func (q *Queries) ArchiveMenuItems(ctx context.Context, dollar_1 []common.UUID) 
 	return err
 }
 
+const getMenuItemsByUUIDs = `-- name: GetMenuItemsByUUIDs :many
+SELECT 
+	restaurant_menu_items.restaurant_menu_item_uuid, restaurant_menu_items.restaurant_uuid, restaurant_menu_items.name, restaurant_menu_items.gross_price, restaurant_menu_items.ordering, restaurant_menu_items.is_archived 
+FROM 
+	orders.restaurant_menu_items AS restaurant_menu_items
+WHERE 
+	restaurant_uuid = $1
+AND 
+	restaurant_menu_item_uuid = ANY ($1::UUID[])
+`
+
+func (q *Queries) GetMenuItemsByUUIDs(ctx context.Context, restaurantUuid app.RestaurantUUID) ([]OrdersRestaurantMenuItem, error) {
+	rows, err := q.db.Query(ctx, getMenuItemsByUUIDs, restaurantUuid)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []OrdersRestaurantMenuItem{}
+	for rows.Next() {
+		var i OrdersRestaurantMenuItem
+		if err := rows.Scan(
+			&i.RestaurantMenuItemUuid,
+			&i.RestaurantUuid,
+			&i.Name,
+			&i.GrossPrice,
+			&i.Ordering,
+			&i.IsArchived,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const getRestaurant = `-- name: GetRestaurant :one
 SELECT
 	restaurant_uuid, name, description, address, currency

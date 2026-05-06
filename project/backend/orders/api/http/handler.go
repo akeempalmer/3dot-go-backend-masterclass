@@ -51,12 +51,10 @@ func (h Handler) RegisterCustomer(ctx context.Context, request RegisterCustomerR
 }
 
 func (h Handler) OnboardRestaurant(ctx context.Context, request OnboardRestaurantRequestObject) (OnboardRestaurantResponseObject, error) {
-
 	// MAP the request body fields to app.Onboard Resaurant and []app.menuItem.
-	var menuItemList = make([]app.MenuItem, 0)
+	menuItemList := make([]app.MenuItem, 0)
 
 	for _, item := range request.Body.MenuItems {
-
 		menuItemList = append(menuItemList, app.MenuItem{
 			MenuItemUUID: item.Uuid,
 			Name:         item.Name,
@@ -80,14 +78,12 @@ func (h Handler) OnboardRestaurant(ctx context.Context, request OnboardRestauran
 	}
 
 	err = h.service.OnboardRestaurant(ctx, request.RestaurantUuid, appRequest)
-
 	if err != nil {
 		// handle error
 		panic("error parsing appmenu")
 	}
 
 	return OnboardRestaurant204Response{}, nil
-
 }
 
 func openapiAddressToSharedAddress(addr Address) (shared.Address, error) {
