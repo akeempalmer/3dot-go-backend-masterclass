@@ -65,4 +65,4 @@ FROM
 WHERE 
 	restaurant_uuid = $1
 AND 
-	restaurant_menu_item_uuid = ANY ($1::UUID[]);
+	restaurant_menu_item_uuid = ANY ($2::UUID[]);

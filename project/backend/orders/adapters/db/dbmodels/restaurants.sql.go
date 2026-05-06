@@ -36,11 +36,16 @@ FROM
 WHERE 
 	restaurant_uuid = $1
 AND 
-	restaurant_menu_item_uuid = ANY ($1::UUID[])
+	restaurant_menu_item_uuid = ANY ($2::UUID[])
 `
 
-func (q *Queries) GetMenuItemsByUUIDs(ctx context.Context, restaurantUuid app.RestaurantUUID) ([]OrdersRestaurantMenuItem, error) {
-	rows, err := q.db.Query(ctx, getMenuItemsByUUIDs, restaurantUuid)
+type GetMenuItemsByUUIDsParams struct {
+	RestaurantUuid app.RestaurantUUID
+	Column2        []common.UUID
+}
+
+func (q *Queries) GetMenuItemsByUUIDs(ctx context.Context, arg GetMenuItemsByUUIDsParams) ([]OrdersRestaurantMenuItem, error) {
+	rows, err := q.db.Query(ctx, getMenuItemsByUUIDs, arg.RestaurantUuid, arg.Column2)
 	if err != nil {
 		return nil, err
 	}
