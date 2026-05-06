@@ -79,14 +79,14 @@ func (h Handler) OnboardRestaurant(ctx context.Context, request OnboardRestauran
 		MenuItems:   menuItemList,
 	}
 
-	err := h.service.OnboardRestaurant(ctx, request.RestaurantUuid, appRequest)
+	err = h.service.OnboardRestaurant(ctx, request.RestaurantUuid, appRequest)
 
 	if err != nil {
 		// handle error
 		panic("error parsing appmenu")
 	}
 
-	return OnboardRestuarant204Response{}, nil
+	return OnboardRestaurant204Response{}, nil
 
 }
 
