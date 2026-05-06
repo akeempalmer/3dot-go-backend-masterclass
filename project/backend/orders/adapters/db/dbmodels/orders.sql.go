@@ -16,7 +16,7 @@ import (
 )
 
 const addQuote = `-- name: AddQuote :exec
-INSERT INTO orders.quotes(
+INSERT INTO orders.quotes (
 	quote_uuid,
 	customer_uuid,
 	restaurant_uuid,
@@ -29,7 +29,7 @@ INSERT INTO orders.quotes(
 	created_at,
 	currency
 )
-VALUES 
+VALUES
 	($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
 `
 
@@ -47,6 +47,7 @@ type AddQuoteParams struct {
 	Currency           shared.Currency
 }
 
+// Quotes are immutable - no update query exists. If needed, create a new quote.
 func (q *Queries) AddQuote(ctx context.Context, arg AddQuoteParams) error {
 	_, err := q.db.Exec(ctx, addQuote,
 		arg.QuoteUuid,

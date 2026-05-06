@@ -50,42 +50,6 @@ func (h Handler) RegisterCustomer(ctx context.Context, request RegisterCustomerR
 	}, nil
 }
 
-func (h Handler) OnboardRestaurant(ctx context.Context, request OnboardRestaurantRequestObject) (OnboardRestaurantResponseObject, error) {
-	// MAP the request body fields to app.Onboard Resaurant and []app.menuItem.
-	menuItemList := make([]app.MenuItem, 0)
-
-	for _, item := range request.Body.MenuItems {
-		menuItemList = append(menuItemList, app.MenuItem{
-			MenuItemUUID: item.Uuid,
-			Name:         item.Name,
-			Ordering:     float64(item.Ordering),
-			GrossPrice:   item.GrossPrice,
-			IsArchived:   false,
-		})
-	}
-
-	addr, err := openapiAddressToSharedAddress(request.Body.Address)
-	if err != nil {
-		return nil, common.NewInvalidInputError("invalid-address", "invalid address: %s", err)
-	}
-
-	appRequest := app.OnboardRestaurant{
-		Name:        request.Body.Name,
-		Address:     addr,
-		Currency:    request.Body.Currency,
-		Description: request.Body.Description,
-		MenuItems:   menuItemList,
-	}
-
-	err = h.service.OnboardRestaurant(ctx, request.RestaurantUuid, appRequest)
-	if err != nil {
-		// handle error
-		panic("error parsing appmenu")
-	}
-
-	return OnboardRestaurant204Response{}, nil
-}
-
 func openapiAddressToSharedAddress(addr Address) (shared.Address, error) {
 	sharedAddr, err := shared.NewAddress(
 		addr.Line1,
@@ -99,6 +63,44 @@ func openapiAddressToSharedAddress(addr Address) (shared.Address, error) {
 	}
 
 	return sharedAddr, nil
+}
+
+func (h Handler) OnboardRestaurant(ctx context.Context, request OnboardRestaurantRequestObject) (OnboardRestaurantResponseObject, error) {
+	if request.Params.OperatorUUID.IsZero() {
+		return nil, common.NewUnauthorizedError("missing-operator-uuid", "operator UUID is required")
+	}
+
+	var menuItems []app.MenuItem
+	for _, item := range request.Body.MenuItems {
+		menuItems = append(menuItems, app.MenuItem{
+			MenuItemUUID: item.Uuid,
+			Name:         item.Name,
+			GrossPrice:   item.GrossPrice,
+			Ordering:     float64(item.Ordering),
+		})
+	}
+
+	addr, err := openapiAddressToSharedAddress(request.Body.Address)
+	if err != nil {
+		return nil, common.NewInvalidInputError("invalid-address", "invalid address: %s", err)
+	}
+
+	err = h.service.OnboardRestaurant(
+		ctx,
+		request.RestaurantUuid,
+		app.OnboardRestaurant{
+			request.Body.Name,
+			addr,
+			request.Body.Currency,
+			request.Body.Description,
+			menuItems,
+		},
+	)
+	if err != nil {
+		return nil, err
+	}
+
+	return OnboardRestaurant204Response{}, nil
 }
 
 func Register(ctx context.Context, e EchoRouter, handler Handler) error {

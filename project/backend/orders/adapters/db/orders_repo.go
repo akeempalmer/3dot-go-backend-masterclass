@@ -2,6 +2,8 @@ package db
 
 import (
 	"context"
+	"fmt"
+	"time"
 
 	pgx "github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -12,23 +14,21 @@ import (
 	"eats/backend/orders/app"
 )
 
-type OrdersRepository struct {
+type OrdersRepo struct {
 	db *pgxpool.Pool
 }
 
-func NewOrdersRepository(db *pgxpool.Pool) *OrdersRepository {
+func NewOrdersRepository(db *pgxpool.Pool) *OrdersRepo {
 	if db == nil {
 		panic("db connection pool cannot be nil")
 	}
 
-	return &OrdersRepository{
-		db: db,
-	}
+	return &OrdersRepo{db: db}
 }
 
-func (o *OrdersRepository) CreateQuote(
+func (r *OrdersRepo) CreateQuote(
 	ctx context.Context,
-	restaurantUUID app.RestaurantUUID,
+	restaurantID app.RestaurantUUID,
 	menuItems app.CreateQuoteItems,
 	updateFn func(
 		ctx context.Context,
@@ -39,88 +39,100 @@ func (o *OrdersRepository) CreateQuote(
 ) (app.Quote, error) {
 	var quote app.Quote
 
-	err := common.UpdateInTx(ctx, o.db, func(ctx context.Context, tx pgx.Tx) error {
+	err := common.UpdateInTx(ctx, r.db, func(ctx context.Context, tx pgx.Tx) error {
 		queries := dbmodels.New(tx)
 
-		// 1. Extract UUIDs
-		menuItemUUIDs := make([]common.UUID, 0, len(menuItems))
+		menuItemsUUIDs := make([]common.UUID, 0, len(menuItems))
 		for _, item := range menuItems {
-			menuItemUUIDs = append(menuItemUUIDs, item.MenuItemUUID.UUID)
+			menuItemsUUIDs = append(menuItemsUUIDs, item.MenuItemUUID.UUID)
 		}
 
-		// 2. Fetch menu items from DB
-		dbMenuItems, err := queries.GetMenuItemsByUUIDs(ctx, dbmodels.GetMenuItemsByUUIDsParams{
-			restaurantUUID,
-			menuItemUUIDs,
-		})
+		appMenuItems, err := r.getMenuItems(ctx, queries, restaurantID, menuItemsUUIDs)
 		if err != nil {
 			return err
 		}
 
-		// 3. Convert to map for updateFn
-		menuItemMap := make(map[app.RestaurantMenuItemUUID]app.MenuItem)
-		for _, dbItem := range dbMenuItems {
-			menuItemMap[dbItem.RestaurantMenuItemUuid] = app.MenuItem{
-				MenuItemUUID: dbItem.RestaurantMenuItemUuid,
-				Name:         dbItem.Name,
-				Ordering:     dbItem.Ordering,
-				GrossPrice:   dbItem.GrossPrice,
-				IsArchived:   dbItem.IsArchived,
-			}
-		}
-
-		// 4. Fetch restaurant
-		dbRestaurant, err := queries.GetRestaurant(ctx, restaurantUUID)
+		restaurant, err := queries.GetRestaurant(ctx, restaurantID)
 		if err != nil {
-			return err
+			return fmt.Errorf("failed to get restaurant currency for restaurant %s: %w", restaurantID, err)
 		}
 
-		// 5. Call domain logic
-		q, quoteMenuItems, err := updateFn(ctx, menuItemMap, dbRestaurant.Currency, dbRestaurant.Address)
+		var items []app.QuoteMenuItem
+		quote, items, err = updateFn(ctx, appMenuItems, restaurant.Currency, restaurant.Address)
 		if err != nil {
-			return err
+			return fmt.Errorf("failed to create quote using updateFn: %w", err)
 		}
 
-		// 6. Persist quotes
 		err = queries.AddQuote(ctx, dbmodels.AddQuoteParams{
-			QuoteUuid:          q.QuoteUUID,
-			CustomerUuid:       q.CustomerUUID,
-			RestaurantUuid:     q.RestaurantUUID,
-			DeliveryAddress:    q.DeliveryAddress,
-			ItemsSubtotalGross: q.ItemsSubtotalGross,
-			ServiceFeeGross:    q.ServiceFeeGross,
-			DeliveryFeeGross:   q.DeliveryFeeGross,
-			TotalAmountGross:   q.TotalAmountGross,
-			TotalTax:           q.TotalTax,
-			CreatedAt:          q.CreatedAt,
-			Currency:           q.Currency,
+			quote.QuoteUUID,
+			quote.CustomerUUID,
+			quote.RestaurantUUID,
+			quote.DeliveryAddress,
+			quote.ItemsSubtotalGross,
+			quote.ServiceFeeGross,
+			quote.DeliveryFeeGross,
+			quote.TotalAmountGross,
+			quote.TotalTax,
+			time.Now(),
+			quote.Currency,
 		})
 		if err != nil {
-			return err
+			return fmt.Errorf("failed to add quote %s: %w", quote.QuoteUUID, err)
 		}
 
-		// 7. Persist quote items
-		dbQuoteItems := make([]dbmodels.AddQuoteItemsParams, 0, len(quoteMenuItems))
-		for _, item := range quoteMenuItems {
-			dbQuoteItems = append(dbQuoteItems, dbmodels.AddQuoteItemsParams{
-				QuoteItemUuid: item.MenuItemUUID.UUID,
-				QuoteUuid:     q.QuoteUUID,
-				MenuItemUuid:  item.MenuItemUUID,
-				GrossPrice:    item.GrossPrice,
-				Quantity:      int32(item.Quantity),
-			})
+		quoteItems := dbQuoteItemsFromApp(items, quote)
+
+		if _, err := queries.AddQuoteItems(ctx, quoteItems); err != nil {
+			return fmt.Errorf("failed to add quote items for quote %s: %w", quote.QuoteUUID, err)
 		}
 
-		_, err = queries.AddQuoteItems(ctx, dbQuoteItems)
-		if err != nil {
-			return err
-		}
-
-		quote = q
 		return nil
 	})
+	if err != nil {
+		return app.Quote{}, err
+	}
 
-	return quote, err
+	return quote, nil
 }
 
-// backend/orders/adapters/db/orders_repo.go:102:40: cannot use item (variable of struct type app.QuoteMenuItem) as dbmodels.AddQuoteItemsParams value in argument to append
+func dbQuoteItemsFromApp(menuItems []app.QuoteMenuItem, quote app.Quote) []dbmodels.AddQuoteItemsParams {
+	quoteItems := make([]dbmodels.AddQuoteItemsParams, 0, len(menuItems))
+	for _, position := range menuItems {
+		quoteItems = append(quoteItems, dbmodels.AddQuoteItemsParams{
+			common.NewUUIDv7(),
+			quote.QuoteUUID,
+			position.MenuItemUUID,
+			position.GrossPrice,
+			int32(position.Quantity),
+		})
+	}
+	return quoteItems
+}
+
+func (r *OrdersRepo) getMenuItems(ctx context.Context, queries *dbmodels.Queries, restaurantUUID app.RestaurantUUID, menuItemsUUIDs []common.UUID) (map[app.RestaurantMenuItemUUID]app.MenuItem, error) {
+	dbMenuItems, err := queries.GetMenuItemsByUUIDs(ctx, dbmodels.GetMenuItemsByUUIDsParams{
+		RestaurantUuid: restaurantUUID,
+		Column2:        menuItemsUUIDs,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("failed to get menu positions: %w", err)
+	}
+
+	return appMenuItemsFromDbMenuItems(dbMenuItems), nil
+}
+
+func appMenuItemsFromDbMenuItems(dbMenuItems []dbmodels.OrdersRestaurantMenuItem) map[app.RestaurantMenuItemUUID]app.MenuItem {
+	appMenuItems := make(map[app.RestaurantMenuItemUUID]app.MenuItem, len(dbMenuItems))
+
+	for _, dbItemPosition := range dbMenuItems {
+		appMenuItems[dbItemPosition.RestaurantMenuItemUuid] = app.MenuItem{
+			dbItemPosition.RestaurantMenuItemUuid,
+			dbItemPosition.Name,
+			dbItemPosition.Ordering,
+			dbItemPosition.GrossPrice,
+			dbItemPosition.IsArchived,
+		}
+	}
+
+	return appMenuItems
+}

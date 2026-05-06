@@ -21,7 +21,6 @@ func NewService(
 	if customerRepository == nil {
 		panic("customerRepository cannot be nil")
 	}
-
 	if orderRepository == nil {
 		panic("orderRepository cannot be nil")
 	}
