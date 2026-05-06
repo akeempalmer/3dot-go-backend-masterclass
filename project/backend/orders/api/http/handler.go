@@ -142,7 +142,7 @@ func (h Handler) CustomerCreateQuote(ctx context.Context, request CustomerCreate
 		TotalGross:         quote.TotalAmountGross,
 		TotalTax:           quote.TotalTax,
 	}
-	return VisitCustomerCreateQuoteResponse{responseQuote}, nil
+	return CustomerCreateQuote201JSONResponse(responseQuote), nil
 }
 
 func Register(ctx context.Context, e EchoRouter, handler Handler) error {
