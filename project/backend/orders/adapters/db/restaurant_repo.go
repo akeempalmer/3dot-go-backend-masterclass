@@ -6,12 +6,10 @@ import (
 	"fmt"
 
 	pgx "github.com/jackc/pgx/v5"
-	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"eats/backend/common"
 	"eats/backend/common/log"
-	"eats/backend/common/shared"
 	"eats/backend/orders/adapters/db/dbmodels"
 	"eats/backend/orders/app"
 )
@@ -34,16 +32,23 @@ func (r *RestaurantRepository) UpsertRestaurant(ctx context.Context, restaurantU
 	return common.UpdateInTx(ctx, r.db, func(ctx context.Context, tx pgx.Tx) error {
 		queries := dbmodels.New(tx)
 
-		dbRestaurantMenu, err := queries.GetRestaurantMenu(ctx, restaurantUUID)
-
 		log.FromContext(ctx).With("restaurant_uuid", restaurantUUID).Info("Upserting restaurant")
+
+		currentMenuItems, err := queries.GetRestaurantMenu(ctx, restaurantUUID)
+		if err != nil {
+			return fmt.Errorf("get current restaurant menu failed: %w", err)
+		}
+		currentMenuItemsUUIDs := make([]app.RestaurantMenuItemUUID, len(currentMenuItems))
+		for i, item := range currentMenuItems {
+			currentMenuItemsUUIDs[i] = item.OrdersRestaurantMenuItem.RestaurantMenuItemUuid
+		}
 
 		dbRestaurant, err := queries.UpsertRestaurant(ctx, dbmodels.UpsertRestaurantParams{
 			restaurantUUID,
 			restaurant.Name,
 			restaurant.Description,
 			restaurant.Address,
-			restaurant.Currency.Code(),
+			restaurant.Currency,
 		})
 		if err != nil {
 			return fmt.Errorf("upsert restaurant failed: %w", err)
@@ -51,11 +56,10 @@ func (r *RestaurantRepository) UpsertRestaurant(ctx context.Context, restaurantU
 
 		// Currency is immutable after creation - the upsert doesn't update it.
 		// Check here catches attempts to change it and returns a clear error.
-		if dbRestaurant.Currency != restaurant.Currency.Code() {
+		if dbRestaurant.Currency != restaurant.Currency {
 			return common.NewInvalidInputError("cannot-change-currency", "cannot change restaurant currency once set")
 		}
 
-		// TODO: upsert menu items
 		for _, item := range restaurant.MenuItems {
 			err = queries.UpsertRestaurantMenuItem(ctx, dbmodels.UpsertRestaurantMenuItemParams{
 				RestaurantMenuItemUuid: item.MenuItemUUID,
@@ -70,46 +74,26 @@ func (r *RestaurantRepository) UpsertRestaurant(ctx context.Context, restaurantU
 			}
 		}
 
-		currentMenuItemsUUIDs := make([]common.UUID, 0)
-		for _, item := range dbRestaurantMenu {
-			currentMenuItemsUUIDs = append(currentMenuItemsUUIDs, item.OrdersRestaurantMenuItem.RestaurantMenuItemUuid.UUID)
-		}
-
-		// get the list of different uuid.
 		menuItemsToArchive := make([]common.UUID, 0)
-		for _, currentUUID := range currentMenuItemsUUIDs {
+		for _, u := range currentMenuItemsUUIDs {
 			found := false
-
-			for _, newItem := range restaurant.MenuItems {
-				if currentUUID == newItem.MenuItemUUID.UUID {
+			for _, c := range restaurant.MenuItems {
+				if u == c.MenuItemUUID {
 					found = true
 					break
 				}
 			}
 			if !found {
-
-				menuItemsToArchive = append(menuItemsToArchive, currentUUID)
+				menuItemsToArchive = append(menuItemsToArchive, u.UUID)
 			}
 		}
-
-		// Call archive
 		if len(menuItemsToArchive) > 0 {
-			pgUUIDs := make([]pgtype.UUID, 0, len(menuItemsToArchive))
-
-			for _, id := range menuItemsToArchive {
-				pgUUIDs = append(pgUUIDs, pgtype.UUID{
-					Bytes: id,
-					Valid: true,
-				})
-			}
-
-			err = queries.ArchiveMenuItems(ctx, pgUUIDs)
-			if err != nil {
-				return fmt.Errorf("archive menu items failed: %w", err)
+			if err := queries.ArchiveMenuItems(ctx, menuItemsToArchive); err != nil {
+				return fmt.Errorf("archive menu positions failed: %w", err)
 			}
 		}
-		return nil
 
+		return nil
 	})
 }
 
@@ -141,13 +125,11 @@ func (r *RestaurantRepository) GetRestaurantMenu(ctx context.Context, restaurant
 		return app.RestaurantMenu{}, fmt.Errorf("get restaurant %s failed: %w", restaurantUUID, err)
 	}
 
-	currencyCode := shared.MustNewCurrency(restaurant.Currency)
-
 	return app.RestaurantMenu{
 		RestaurantName: restaurant.Name,
 		Address:        restaurant.Address,
 		Description:    restaurant.Description,
-		Currency:       currencyCode,
+		Currency:       restaurant.Currency,
 		Positions:      items,
 	}, nil
 }

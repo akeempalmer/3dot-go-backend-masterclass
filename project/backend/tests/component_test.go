@@ -1,24 +1,23 @@
+// This file contains tests that are executed to verify your solution.
+// It's read-only, so all modifications will be ignored.
 package tests_test
 
 import (
 	"testing"
 
-	"eats/backend/common/testutils"
-
 	"github.com/stretchr/testify/assert"
+
+	"eats/backend/common/testutils"
 )
 
 func TestComponent_CriticalFlow(t *testing.T) {
 	t.Parallel()
-	t.Helper()
+	clients := newTestClients(t)
 
 	ctx := t.Context()
 
 	country := testutils.GenerateRandomCountry()
 
-	clients := newTestClients(t)
-
-	customerUUID := registerCustomerInCity(ctx, t, clients, country, "New York")
-
+	customerUUID := registerCustomerInCity(ctx, t, clients, country, "Some city")
 	assert.NotEmpty(t, customerUUID)
 }

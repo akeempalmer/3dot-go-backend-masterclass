@@ -25,11 +25,18 @@ sql:
               import: "time"
               type: "Time"
 
-          - column: "orders.customers.customer_uuid"
+          # Use shopspring/decimal for money - floats have precision issues.
+          # See: https://github.com/shopspring/decimal#why-dont-you-just-use-float64
+          - db_type: "pg_catalog.numeric"
+            go_type:
+              import: "github.com/shopspring/decimal"
+              type: "Decimal"
+
+          - db_type: "uuid"
             nullable: false
             go_type:
-              import: "eats/backend/orders/app"
-              type: "CustomerUUID"
+              import: "eats/backend/common"
+              type: "UUID"
 
           - db_type: "uuid"
             nullable: true
@@ -52,10 +59,10 @@ sql:
               import: "eats/backend/orders/app"
               type: "RestaurantUUID"
 
-          - db_type: "pg_catalog.numeric"
+          - column: "orders.restaurants.currency"
             go_type:
-              import: "github.com/shopspring/decimal"
-              type: "Decimal"
+              import: "eats/backend/common/shared"
+              type: "Currency"
 
           - column: "orders.restaurants.address"
             go_type:

@@ -4,12 +4,12 @@ import (
 	"context"
 	"fmt"
 
+	pgx "github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgxpool"
+
 	"eats/backend/common"
 	"eats/backend/orders/adapters/db/dbmodels"
 	"eats/backend/orders/app"
-
-	pgx "github.com/jackc/pgx/v5"
-	"github.com/jackc/pgx/v5/pgxpool"
 )
 
 type CustomerRepository struct {
@@ -33,7 +33,7 @@ func (r *CustomerRepository) RegisterCustomer(ctx context.Context, customer app.
 		err := queries.InsertCustomer(ctx, dbmodels.InsertCustomerParams{
 			CustomerUuid: customer.CustomerUUID,
 			Name:         customer.Name,
-			Email:        string(customer.Email),
+			Email:        customer.Email,
 			Address:      customer.Address,
 			PhoneNumber:  customer.PhoneNumber,
 		})

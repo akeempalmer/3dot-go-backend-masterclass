@@ -23,7 +23,7 @@ type OrdersRestaurant struct {
 	Name           string
 	Description    string
 	Address        shared.Address
-	Currency       string
+	Currency       shared.Currency
 }
 
 type OrdersRestaurantMenuItem struct {
