@@ -103,6 +103,48 @@ func (h Handler) OnboardRestaurant(ctx context.Context, request OnboardRestauran
 	return OnboardRestaurant204Response{}, nil
 }
 
+func (h Handler) CustomerCreateQuote(ctx context.Context, request CustomerCreateQuoteRequestObject) (CustomerCreateQuoteResponseObject, error) {
+
+	// 1. Map request Body itemsand convert delivery address
+	items := make([]app.CreateQuoteItem, 0)
+	for _, item := range request.Body.Items {
+		items = append(items, app.CreateQuoteItem{
+			MenuItemUUID: item.MenuItemUuid,
+			Quantity:     item.Quantity,
+		})
+	}
+
+	addr, err := openapiAddressToSharedAddress(request.Body.DeliveryAddress)
+	if err != nil {
+		return nil, common.NewInvalidInputError("invalid-address", "invalid address: %s", err)
+	}
+
+	// 2. Build the app.CreateQuote and call h.service.CreateQuote
+	dbQuote := app.CreateQuote{
+		CustomerUUID:    request.Params.CustomerUUID,
+		RestaurantUUID:  request.Body.RestaurantUuid,
+		QuoteItems:      items,
+		DeliveryAddress: addr,
+	}
+	quote, err := h.service.CreateQuote(ctx, dbQuote)
+	if err != nil {
+		return nil, err
+	}
+
+	// 3. Return a customer 201 json response with all quote fields.
+	responseQuote := CreateQuoteResponse{
+		QuoteUuid:          quote.QuoteUUID,
+		Currency:           quote.Currency,
+		DeliveryFeeGross:   quote.DeliveryFeeGross,
+		ExpiresAt:          quote.ExpirationTime(),
+		ItemsSubtotalGross: quote.ItemsSubtotalGross,
+		ServiceFeeGross:    quote.ServiceFeeGross,
+		TotalGross:         quote.TotalAmountGross,
+		TotalTax:           quote.TotalTax,
+	}
+	return VisitCustomerCreateQuoteResponse{responseQuote}, nil
+}
+
 func Register(ctx context.Context, e EchoRouter, handler Handler) error {
 	RegisterHandlers(e, NewStrictHandler(handler, nil))
 
